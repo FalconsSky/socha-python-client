@@ -8,8 +8,10 @@
 [![Discord](https://img.shields.io/discord/233577109363097601?color=blue&label=Discord)](https://discord.gg/ARZamDptG5)
 [![Documentation](https://img.shields.io/badge/Software--Challenge%20-Documentation-%234299e1)](https://docs.software-challenge.de/)
 
-> Please read the [documentation for this client](https://software-challenge-python-client.readthedocs.io/en/latest/)
-> before you asking questions or opening an issue.
+> Please note that this is a version with Python bindings written in Rust.
+> This package is highly **experimental** and is currently released mainly for testing.
+> In addition, a few methods and classes **differ** from the pure python version, which is due to the nature of Rust.
+> Furthermore, it should be noted that at least Python **3.7** is required for this package.
 
 This repository contains the Python package for the
 [Software-Challenge Germany](https://www.software-challenge.de), a programming competition for students. The students
@@ -29,27 +31,29 @@ Therefore,
 the possibility of a virtual environment is presented,
 which installs the packages inside the folder.
 
-> Pleas make sure that you have at least **Python 3.6** installed.
+> Pleas make sure that you have at least **Python 3.7** installed.
 > Check with `$ python -V` or `$ python3 -V`.
 > 
 > If not present you can install python with the following commands:
-> - Windows: `> winget install -e --id Python.Python.3.6`
-> - Debian: `$ sudo apt install python3.6`
+> - Windows: `> winget install -e --id Python.Python.3.7`
+> - Debian: `$ sudo apt install python3.7`
 > - Arch: `$ sudo pacman -S python`
 
 ### Globally
 
-The installation is quite simple with pip.
+To download this package, follow these steps:
+
+1. Go to the repository where the package is located.
+2. Navigate to the dist/ directory.
+3. Choose the correct package version for your Python version (3.7 to 3.11) 
+and operating system (Linux, Windows, or Mac OS). 
+The package name will help you identify the correct version.
+4. Download the wheel file.
+5. Use pip to install the package. 
+The installation process should be straightforward once you have downloaded the wheel.
 
 ```shell
-$ pip install socha
-```
-
-If you want to install the package manually, then you have to download the release of your choice, unpack the package
-and then run `setup.py` with Python.
-
-```shell
-$ python setup.py install --user
+$ pip install path/to/package/wheel
 ```
 
 This should satisfy the dependencies and you can start right away.
@@ -87,10 +91,19 @@ On Windows:
 ```
 
 It should open the *venv* and you can now install packages and run your scripts here.
-To develop your player you just have to install the package socha with `pip`.
+To download this package, follow these steps:
+
+1. Go to the repository where the package is located.
+2. Navigate to the dist/ directory.
+3. Choose the correct package version for your Python version (3.7 to 3.11) 
+and operating system (Linux, Windows, or Mac OS). 
+The package name will help you identify the correct version.
+4. Download the wheel file.
+5. Use pip to install the package. 
+The installation process should be straightforward once you have downloaded the wheel.
 
 ```shell
-(venv) $ pip install socha
+(venv) $ pip install path/to/package/wheel
 ```
 
 This should satisfy the dependencies and you can start right away.
@@ -107,6 +120,8 @@ you can of course import only what you actually need.
 
 ````python
 from socha import *
+from socha.api.networking.player_client import IClientHandler
+from socha.starter import Starter
 ````
 
 If you now want to develop and implement your logic, then the structure of the class should look like this.
