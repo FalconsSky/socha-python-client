@@ -20,6 +20,8 @@
        describing the then current state.
        */
 
+use std::ops::Div;
+use libm::floor;
 use pyo3::prelude::*;
 
 use crate::plugin::board::Board;
@@ -172,7 +174,36 @@ impl GameState {
         self.possible_moves(_move.team.clone()).contains(_move)
     }
 
-    pub fn perform_move(&self, _move: &Move) -> GameState {
-        self.clone()
+    fn perform_move(&self, _move: Move) -> GameState {
+        if self.is_valid_move(&_move) {
+            let new_board = self.board._move(&_move);
+            let adding_fish = new_board.get_field(&_move.to_value).get_fish();
+            let (new_fishes_one, new_fishes_two) = match self.current_team {
+                Team::ONE => (self.fishes.fishes_one + adding_fish, self.fishes.fishes_two),
+                Team::TWO => (self.fishes.fishes_one, self.fishes.fishes_two + adding_fish),
+            };
+            let new_fishes = Fishes { new_fishes_one, new_fishes_two };
+            let new_score = Score {
+                team_one: self.score.player_one,
+                team_two: self.score.player_two,
+            };
+            let new_progress = Progress {
+                round: floor(self.progress.turn + 1.div(2)) + 1,
+                turn: self.progress.turn + 1,
+            };
+            GameState {
+                welcome_message: self.welcome_message.clone(),
+                start_team: self.start_team.clone(),
+                board: new_board,
+                progress: new_progress,
+                score: new_score,
+                last_move: Some(_move),
+            }
+        } else {
+            logging::error!("Performed invalid move while simulating: {}", move);
+            panic!("Invalid move: {}", move)
+        }
     }
+
+
 }
