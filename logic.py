@@ -3,7 +3,7 @@ import random
 from socha import *
 
 
-class Logic(IClientHandler):
+class Logic(AbstractGameClient):
     game_state: GameState
 
     def calculate_move(self) -> Move:
@@ -15,4 +15,4 @@ class Logic(IClientHandler):
 
 
 if __name__ == "__main__":
-    Starter(logic=Logic())
+    GameClientStarter(logic=Logic())

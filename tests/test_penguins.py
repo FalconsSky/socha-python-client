@@ -91,7 +91,7 @@ class MoveTest(unittest.TestCase):
 class TeamTest(unittest.TestCase):
     def testTeamInit(self):
         t = Team(color="ONE")
-        self.assertEqual(t.color(), "ONE")
+        self.assertEqual(t.color, "ONE")
 
 
 class FieldTest(unittest.TestCase):
@@ -99,7 +99,7 @@ class FieldTest(unittest.TestCase):
         f = Field(coordinate=HexCoordinate(0, 0), field="ONE")
         self.assertEqual(f.coordinate.x, 0)
         self.assertEqual(f.coordinate.y, 0)
-        self.assertEqual(f.field.color(), "ONE")
+        self.assertEqual(f.field.color, "ONE")
 
     def testGetEmptyField(self):
         list_value = []
@@ -177,24 +177,17 @@ class BoardTest(unittest.TestCase):
 
 
 class GameStateTest(unittest.TestCase):
-    b = Board(game_field=[[Field(coordinate=CartesianCoordinate(j, i).to_hex(), field=1) for i in range(8)] for j in
-                          range(8)])
-    g = GameState(board=b, turn=1, start_team=Team(color="ONE"), fishes=Fishes(fishes_one=1, fishes_two=0),
-                  last_move=Move(from_value=None, to_value=HexCoordinate(7, 7)))
+    def setUp(self):
+        b = Board(game_field=[[Field(coordinate=CartesianCoordinate(j, i).to_hex(), field=1) for i in range(8)] for j in
+                              range(8)])
+        self.g = GameState(board=b, turn=1, start_team=Team(color="ONE"), fishes=Fishes(fishes_one=1, fishes_two=0),
+                           last_move=Move(from_value=None, to_value=HexCoordinate(7, 7)))
 
-    def testGameStateInit(self):
-        self.assertEqual(self.g.turn, 1)
-        self.assertEqual(self.g.start_team.color(), Team(color="ONE").color())
-        self.assertEqual(self.g.fishes.fishes_one, Fishes(fishes_one=1, fishes_two=0).fishes_one)
-        self.assertEqual(self.g.fishes.fishes_two, Fishes(fishes_one=1, fishes_two=0).fishes_two)
-
-    def test_perform_low_index_move(self):
-        new_state = self.g.perform_move(Move(to_value=HexCoordinate(1, 1)))
-        self.assertEqual(new_state.turn, 2)
-        self.assertEqual(new_state.fishes.fishes_one, 1)
-        self.assertEqual(new_state.fishes.fishes_two, 1)
-        self.assertEqual(new_state.last_move.to_value.x, 1)
-        self.assertEqual(new_state.last_move.to_value.y, 1)
+    def test_perform_error_move(self):
+        self.g.board._game_field[0][0].field = 0
+        self.g.possible_moves = self.g._get_possible_moves(self.g.current_team)
+        with self.assertRaises(Exception):
+            self.g.perform_move(Move(to_value=HexCoordinate(0, 0)))
 
     def test_perform_high_index_move(self):
         new_state = self.g.perform_move(Move(to_value=HexCoordinate(15, 7)))
@@ -204,8 +197,16 @@ class GameStateTest(unittest.TestCase):
         self.assertEqual(new_state.last_move.to_value.x, 15)
         self.assertEqual(new_state.last_move.to_value.y, 7)
 
-    def test_perform_error_move(self):
-        self.g.board._game_field[0][0].field = 0
-        self.g.possible_moves = self.g._get_possible_moves(self.g.current_team)
-        with self.assertRaises(Exception):
-            self.g.perform_move(Move(to_value=HexCoordinate(0, 0)))
+    def testGameStateInit(self):
+        self.assertEqual(self.g.turn, 1)
+        self.assertEqual(self.g.start_team.color, Team(color="ONE").color)
+        self.assertEqual(self.g.fishes.fishes_one, Fishes(fishes_one=1, fishes_two=0).fishes_one)
+        self.assertEqual(self.g.fishes.fishes_two, Fishes(fishes_one=1, fishes_two=0).fishes_two)
+
+    def test_perform_low_index_move(self):
+        new_state = self.g.perform_move(Move(to_value=HexCoordinate(2, 0)))
+        self.assertEqual(new_state.turn, 2)
+        self.assertEqual(new_state.fishes.fishes_one, 1)
+        self.assertEqual(new_state.fishes.fishes_two, 1)
+        self.assertEqual(new_state.last_move.to_value.x, 2)
+        self.assertEqual(new_state.last_move.to_value.y, 0)

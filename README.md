@@ -112,7 +112,7 @@ from socha import *
 If you now want to develop and implement your logic, then the structure of the class should look like this.
 
 ````python
-class Logic(IClientHandler):
+class Logic(AbstractGameClient):
     gameState: GameState
 
     def calculate_move(self) -> Move:
@@ -124,14 +124,14 @@ class Logic(IClientHandler):
 ````
 
 The above example is the simplest working Logic you can build. As you can see the Logic must inherit from
-the `IClientHandler`, so that you can overwrite its methods and the api knows where to find your logic.
+the `AbstractGameClient`, so that you can overwrite its methods and the api knows where to find your logic.
 
 If you're done with your version of an working player, than you have to finish your file with this function, where you
-call the Starter with your desired arguments. The following starts the client with the default arguments.
+call the GameClientStarter with your desired arguments. The following starts the client with the default arguments.
 
 ````python
 if __name__ == "__main__":
-    Starter(Logic())
+    GameClientStarter(Logic())
 ````
 
 ### Start arguments

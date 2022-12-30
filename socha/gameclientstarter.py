@@ -5,17 +5,17 @@ import argparse
 import datetime
 import logging
 
-from socha.api.networking.player_client import _PlayerClient, IClientHandler
+from socha.api.networking.game_client import GameClient, AbstractGameClient
 
 
-class Starter:
+class GameClientStarter:
     """
     When this is called, the client will try to connect to the server and join a game.
     When successful, the client will start the loop and call the on_update and calculate_move methods,
     if the server sends updates.
     """
 
-    def __init__(self, logic: IClientHandler, host: str = "localhost", port: int = 13050, reservation: str = None,
+    def __init__(self, logic: AbstractGameClient, host: str = "localhost", port: int = 13050, reservation: str = None,
                  room_id: str = None, survive: bool = False, log: bool = False, verbose: bool = False):
         """
         All these arguments can be overwritten, when parsed via start arguments,
@@ -53,7 +53,7 @@ class Starter:
             logging.basicConfig(level=level, format="%(asctime)s: %(levelname)s - %(message)s")
         logging.info("Starting...")
 
-        self.client = _PlayerClient(host=self.host, port=self.port, handler=logic, survive=self.survive)
+        self.client = GameClient(host=self.host, port=self.port, handler=logic, survive=self.survive)
 
         if reservation:
             self.client.join_game_with_reservation(reservation)

@@ -1,11 +1,11 @@
-from socha.api.networking.player_client import IClientHandler
+from socha.api.networking.game_client import AbstractGameClient
 from socha.api.plugin.penguins import *
 from socha.api.protocol.protocol import Result
-from socha.starter import Starter
+from socha.gameclientstarter import GameClientStarter
 
 __all__ = [
-    'IClientHandler',
-    'Starter',
+    'AbstractGameClient',
+    'GameClientStarter',
     'Vector',
     'CartesianCoordinate',
     'HexCoordinate',

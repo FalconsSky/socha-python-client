@@ -353,28 +353,24 @@ class Team:
     def __init__(self, color: str):
         """
         A Team can be either yourself or your opponent.
-        
+
         :param color: The color of the team. Can be either 'ONE' or 'TWO'.
         """
-        self.one = {
-            'opponent': 'TWO',
-            'name': 'ONE',
-            'letter': 'R',
-            'color': 'Rot'
+        self.teams = {
+            'ONE': {
+                'opponent': 'TWO',
+                'letter': 'R',
+                'color': 'Rot'
+            },
+            'TWO': {
+                'opponent': 'ONE',
+                'letter': 'B',
+                'color': 'Blau'
+            }
         }
-        self.two = {
-            'opponent': 'ONE',
-            'name': 'TWO',
-            'letter': 'B',
-            'color': 'Blau'
-        }
-        self.team_enum = None
-        if color == "ONE":
-            self.team_enum = self.one
-        elif color == "TWO":
-            self.team_enum = self.two
-        else:
-            raise Exception(f"Invalid : {color}")
+        if color not in self.teams:
+            raise Exception(f"Invalid color: {color}")
+        self.color = color
 
     def team(self) -> 'Team':
         """
@@ -382,23 +378,17 @@ class Team:
         """
         return self
 
-    def color(self) -> str:
-        """
-        :return: The color of this team.
-        """
-        return self.team_enum['name']
-
     def opponent(self) -> 'Team':
         """
         :return: The opponent of this team.
         """
-        return Team(self.team_enum['opponent'])
+        return Team(self.teams[self.color]['opponent'])
 
     def __eq__(self, __o: object) -> bool:
-        return isinstance(__o, Team) and self.team_enum['name'] == __o.team_enum['name']
+        return isinstance(__o, Team) and self.color == __o.color
 
     def __str__(self) -> str:
-        return self.team_enum['name']
+        return self.teams[self.color]
 
 
 class Field:
@@ -576,11 +566,8 @@ class Board:
         :param other: The other board to compare to.
         :return: A list of Fields that are different or a empty list if the boards are equal.
         """
-        fields = []
-        for x in range(len(self._game_field)):
-            for y in range(len(self._game_field[0])):
-                if self._game_field[x][y] != other._game_field[x][y]:
-                    fields.append(self._game_field[x][y])
+        fields = [field for row in [self_field for self_field, other_field in zip(self._game_field, other._game_field)
+                                    if self_field != other_field] for field in row]
         return fields
 
     def contains(self, field: Field) -> bool:
@@ -618,8 +605,9 @@ class Board:
         moves = []
         for i in range(1, self.width()):
             destination = origin.add_vector(direction.scalar_product(i))
+            move = Move(from_value=origin, to_value=destination)
             if self._is_destination_valid(destination):
-                moves.append(Move(from_value=origin, to_value=destination))
+                moves.append(move)
             else:
                 break
         return moves
@@ -637,11 +625,9 @@ class Board:
         :raise: IndexError if the position is not valid.
         """
         if not self.is_valid(position):
-            raise IndexError(f"Index out of range: [x={position.x}, y={position.y}]")
-        moves = []
-        for direction in Vector().directions:
-            moves.extend(self.get_moves_in_direction(position, direction))
-        return moves
+            raise ValueError(f"Invalid position: [x={position.x}, y={position.y}]")
+
+        return [move for direction in Vector().directions for move in self.get_moves_in_direction(position, direction)]
 
     def get_penguins(self) -> List[Field]:
         """
@@ -699,7 +685,7 @@ class Board:
         """
         return [field for field in self.get_all_fields() if field in other]
 
-    def _move(self, move: Move) -> 'Board':
+    def move(self, move: Move) -> 'Board':
         """
         Moves the penguin from the origin to the destination.
 
@@ -707,12 +693,11 @@ class Board:
         :return: The new board with the moved penguin.
         """
         new_board = Board(self._game_field)
-        to_field = new_board.get_field(move.to_value)
-        to_field_coo = move.to_value.to_cartesian()
-        new_board._game_field[to_field_coo.x][to_field_coo.y] = Field(coordinate=move.to_value, field=to_field.field)
+        new_board._game_field[move.to_value.to_cartesian().x][move.to_value.to_cartesian().y] = \
+            Field(coordinate=move.to_value, field=new_board.get_field(move.to_value).field)
         if move.from_value:
-            from_field_coo = move.from_value.to_cartesian()
-            new_board._game_field[from_field_coo.x][from_field_coo.y] = Field(coordinate=move.from_value, field=0)
+            new_board._game_field[move.from_value.to_cartesian().x][move.from_value.to_cartesian().y] = \
+                Field(coordinate=move.from_value, field=0)
         return new_board
 
     @staticmethod
@@ -764,29 +749,35 @@ class Fishes:
         """
         return self.fishes_one if team.team_enum == Team("ONE").team_enum else self.fishes_two
 
+    def add_fish(self, team: Team, fish: int):
+        if team == Team("ONE"):
+            self.fishes_one += fish
+        elif team == Team("TWO"):
+            self.fishes_two += fish
+        else:
+            raise ValueError(f"Invalid team: {team}")
+        return self
+
 
 class GameState:
     """
-       A `GameState` contains all information, that describes the game state at a given time, that is, between two game
-       moves.
+    The GameState object is a central component of a game and stores important information about the current state of
+    the game. This information includes:
 
-       This includes:
-            - the board
-            - a consecutive turn number (round & turn) and who's turn it is
-            - the team that has started the game
-            - the number of fishes each player has
-            - the last move made
+    - The game board
+    - The turn number and whose turn it is
+    - The team that started the game
+    - The number of fish each player has
+    - The last move made
 
-       The `GameState` is thus the central object through which all essential information of the current game can be
-       accessed.
+    In addition to storing this information, the GameState also provides helpful methods for:
 
-       Therefore, for easier handling, it offers further aids, such as:
-            - a method to calculate available moves
-            - a method to perform a move for simulating future game states
+    - Calculating available moves
+    - Simulating future game states
 
-       The game server sends a new copy of the `GameState` to both participating players after each completed move,
-       describing the then current state.
-       """
+    After each completed move, the game server sends a copy of the updated GameState to both participating players,
+    keeping them informed about the current state of the game.
+    """
 
     def __init__(self, board: Board, turn: int, start_team: Team, fishes: Fishes, last_move: Move = None):
         """
@@ -810,24 +801,15 @@ class GameState:
         self.possible_moves = self._get_possible_moves(self.current_team)
 
     def _get_possible_moves(self, current_team: Team = None) -> List[Move]:
-        """
-        Gets all possible moves for the current team.
-        That includes all possible moves from all Fields that are not occupied by a penguin from that team.
-
-        :param current_team: The team to get the possible moves for.
-        :return: A list of all possible moves from the current player's turn.
-        """
         current_team = current_team or self.current_team
-        moves = []
+        fields = [self.board.get_field(CartesianCoordinate(x, y).to_hex()) for x in range(self.board.width()) for y in
+                  range(self.board.height())]
         if len(self.board.get_teams_penguins(current_team)) < 4:
-            for x in range(self.board.width()):
-                for y in range(self.board.height()):
-                    field = self.board.get_field(CartesianCoordinate(x, y).to_hex())
-                    if not field.is_occupied() and field.get_fish() == 1:
-                        moves.append(Move(from_value=None, to_value=CartesianCoordinate(x, y).to_hex()))
+            moves = [Move(from_value=None, to_value=field.coordinate) for field in fields if
+                     not field.is_occupied() and field.get_fish() == 1]
         else:
-            for piece in self.board.get_teams_penguins(current_team):
-                moves.extend(self.board.possible_moves_from(piece))
+            moves = [move for penguin in self.board.get_teams_penguins(current_team) for move in
+                     self.board.possible_moves_from(penguin)]
         return moves
 
     def current_team_from_turn(self) -> Team:
@@ -837,9 +819,8 @@ class GameState:
         :return: The team that has the current turn.
         """
         current_team_by_turn = self.start_team if self.turn % 2 == 0 else self.start_team.opponent()
-        if not self._get_possible_moves(current_team_by_turn):
-            return current_team_by_turn.opponent()
-        return current_team_by_turn
+        return current_team_by_turn.opponent() if not self._get_possible_moves(current_team_by_turn) else \
+            current_team_by_turn
 
     def perform_move(self, move: Move) -> 'GameState':
         """
@@ -848,27 +829,21 @@ class GameState:
         :param move: The move to perform.
         :return: The new game state after the move has been performed.
         """
-        if self.is_valid_move(move):
-            new_board = self.board._move(move)
-            adding_fish = new_board.get_field(move.to_value).get_fish()
-            new_fishes_one = self.fishes.fishes_one + adding_fish if self.current_team == Team("ONE") else \
-                self.fishes.fishes_one
-            new_fishes_two = self.fishes.fishes_two + adding_fish if self.current_team == Team("TWO") else \
-                self.fishes.fishes_two
-            new_fishes = Fishes(new_fishes_one, new_fishes_two)
-            return GameState(board=new_board, turn=self.turn + 1, start_team=self.start_team, fishes=new_fishes,
-                             last_move=move)
-        logging.error(f"Performed invalid move while simulating: {move}")
-        raise Exception(f"Invalid move: {move}")
+        if not self.is_valid_move(move):
+            logging.error(f"Performed invalid move while simulating: {move}")
+            raise Exception(f"Invalid move: {move}")
+
+        new_board = self.board.move(move)
+        new_fishes = self.fishes.add_fish(self.current_team, new_board.get_field(move.to_value).get_fish())
+        return GameState(board=new_board, turn=self.turn + 1, start_team=self.start_team, fishes=new_fishes,
+                         last_move=move)
 
     def is_valid_move(self, move: Move) -> bool:
         """
         Checks if the given move is valid.
-        
+
         :param move: The move to check.
         :return: True if the move is valid, False otherwise.
         """
-        for possible_move in self.possible_moves:
-            if possible_move == move:
-                return True
-        return False
+        return move in self.possible_moves
+

@@ -6,7 +6,7 @@ import sys
 import time
 from typing import List, Union
 
-from socha.api.networking._xflux import _XFluxClient
+from socha.api.networking.xmlprotocolinterface import XMLProtocolInterface
 from socha.api.plugin import penguins
 from socha.api.plugin.penguins import Field, GameState, Move, CartesianCoordinate
 from socha.api.protocol.protocol import State, Board, Data, \
@@ -19,17 +19,13 @@ def _convertBoard(protocolBoard: Board) -> penguins.Board:
     Converts a protocol Board to a usable game board for using in the logic.
     :rtype: object
     """
-    boardList: List[List[Field]] = []
-    for y, row in enumerate(protocolBoard.list_value):
-        rowList: List[Field] = []
-        for x, fieldsValue in enumerate(row.field_value):
-            fieldCoordinate = CartesianCoordinate(x, y).to_hex()
-            rowList.append(Field(coordinate=fieldCoordinate, field=fieldsValue))
-        boardList.append(rowList)
+    boardList = [
+        [Field(CartesianCoordinate(x, y).to_hex(), fieldsValue) for x, fieldsValue in enumerate(row.field_value)]
+        for y, row in enumerate(protocolBoard.list_value)]
     return penguins.Board(boardList)
 
 
-class IClientHandler:
+class AbstractGameClient:
     history: List[Union[GameState, Error, Result]] = []
 
     def calculate_move(self) -> Move:
@@ -96,7 +92,7 @@ class IClientHandler:
         If the client is running on survive mode it'll be running until shut downed manually.
         """
 
-    def while_disconnected(self, player_client: '_PlayerClient'):
+    def while_disconnected(self, player_client: 'GameClient'):
         """
         The client loop will keep calling this method while there is no active connection to a game server.
         This can be used to do tasks after a game is finished and the server left.
@@ -108,63 +104,80 @@ class IClientHandler:
         """
 
 
-class _PlayerClient(_XFluxClient):
+class GameClient(XMLProtocolInterface):
     """
     The PlayerClient handles all incoming and outgoing objects accordingly to their types.
     """
 
-    def __init__(self, host: str, port: int, handler: IClientHandler, survive: bool):
+    def __init__(self, host: str, port: int, handler: AbstractGameClient, survive: bool):
         super().__init__(host, port)
         self._game_handler = handler
         self.survive = survive
 
     def join_game(self):
-        super()._send(Join())
+        self._send(Join())
 
     def join_game_room(self, room_id: str):
-        super()._send(JoinRoom(room_id=room_id))
+        self._send(JoinRoom(room_id=room_id))
 
     def join_game_with_reservation(self, reservation: str):
-        super()._send(JoinPrepared(reservation_code=reservation))
+        self._send(JoinPrepared(reservation_code=reservation))
 
     def send_message_to_room(self, room_id: str, message):
-        super()._send(Room(room_id=room_id, data=message))
+        self._send(Room(room_id=room_id, data=message))
 
     def _on_object(self, message):
-        if isinstance(message, Room):
-            room_id: str = message.room_id
-            data = message.data.class_binding
-            if isinstance(data, MoveRequest):
-                start_time = time.time()
-                response = self._game_handler.calculate_move()
-                logging.info(f"Sent {response} after {time.time() - start_time} seconds.")
-                if response:
-                    from_value = None
-                    to = To(x=response.to_value.x, y=response.to_value.y)
-                    if response.from_value:
-                        from_value = From(x=response.from_value.x, y=response.from_value.y)
-                    response = Data(class_value="move", from_value=from_value, to=to)
-                    self.send_message_to_room(room_id, response)
-            if isinstance(data, ObservableRoomMessage):
-                if isinstance(data, State):
-                    game_state = GameState(turn=data.turn, start_team=Team(data.start_team),
-                                           board=_convertBoard(data.board), last_move=data.last_move,
-                                           fishes=penguins.Fishes(data.fishes.int_value[0], data.fishes.int_value[1]))
-                    self._game_handler.history.append(game_state)
-                    self._game_handler.on_update(game_state)
-                elif isinstance(data, Result):
-                    self._game_handler.history.append(data)
-                    self._game_handler.on_game_over(data)
-            if isinstance(data, Error):
-                logging.error(data.message)
-                self._game_handler.history.append(data)
-                self._game_handler.on_error(data.message)
-            else:
-                self._game_handler.on_room_message(data)
-        elif isinstance(message, Joined):
-            self._game_handler.on_game_joined(room_id=message.room_id)
+        # Extract room ID from the message
+        room_id = message.room_id
+
+        # Check if the message is a Joined object
+        if isinstance(message, Joined):
+            self._game_handler.on_game_joined(room_id=room_id)
+
+        # Check if the message is a Left object
         elif isinstance(message, Left):
             self._game_handler.on_game_left()
+
+        # Check if the data is a MoveRequest
+        elif isinstance(message.data.class_binding, MoveRequest):
+            # Calculate the move and log the time it took
+            start_time = time.time()
+            move_response = self._game_handler.calculate_move()
+            logging.info(f"Sent {move_response} after {time.time() - start_time} seconds.")
+            # If a move was found, create a Data object with the move information and send it to the room
+            if move_response:
+                from_pos = None
+                to_pos = To(x=move_response.to_value.x, y=move_response.to_value.y)
+                if move_response.from_value:
+                    from_pos = From(x=move_response.from_value.x, y=move_response.from_value.y)
+                response = Data(class_value="move", from_value=from_pos, to=to_pos)
+                self.send_message_to_room(room_id, response)
+
+        # Check if the data is an ObservableRoomMessage
+        elif isinstance(message.data.class_binding, ObservableRoomMessage):
+            # Check if the data is a State object
+            if isinstance(message.data.class_binding, State):
+                # Convert the board data and create a GameState object
+                game_state = GameState(
+                    turn=message.data.class_binding.turn,
+                    start_team=Team(message.data.class_binding.start_team),
+                    board=_convertBoard(message.data.class_binding.board),
+                    last_move=message.data.class_binding.last_move,
+                    fishes=penguins.Fishes(message.data.class_binding.fishes.int_value[0],
+                                           message.data.class_binding.fishes.int_value[1]),
+                )
+                # Add the game state to the history and call the on_update handler
+                self._game_handler.history.append(game_state)
+                self._game_handler.on_update(game_state)
+            # Check if the data is a Result object
+            elif isinstance(message.data.class_binding, Result):
+                # Add the result to the history and call the on_game_over handler
+                self._game_handler.history.append(message.data.class_binding)
+                self._game_handler.on_game_over(message.data.class_binding)
+
+            # Check if the message is a Room object
+            elif isinstance(message, Room):
+                self._game_handler.on_room_message(message.data.class_binding)
 
     def start(self):
         """
@@ -173,26 +186,35 @@ class _PlayerClient(_XFluxClient):
         self._running = True
         self._client_loop()
 
+    def _handle_left(self):
+        if not self.survive:
+            logging.info("The server left.")
+            self.stop()
+        else:
+            logging.info("The server left. Client is in survive mode and keeps running.\n"
+                         "Please shutdown the client manually.")
+            self.disconnect()
+
+    def _handle_other(self, response):
+        logging.debug(f"Received new object: {response}")
+        self._on_object(response)
+
     def _client_loop(self):
         """
         The client loop is the main loop, where the client waits for messages from the server
         and handles them accordingly.
         """
+
         while self._running:
             if self._network_interface.connected:
                 response = self._receive()
-                if isinstance(response, ProtocolPacket):
+                if not response:
+                    continue
+                elif isinstance(response, ProtocolPacket):
                     if isinstance(response, Left):
-                        if not self.survive:
-                            logging.info("The server left.")
-                            self.stop()
-                        else:
-                            logging.info("The server left. Client is in survive mode and keeps running.\n"
-                                         "Please shutdown the client manually.")
-                            self.close_connection()
+                        self._handle_left()
                     else:
-                        logging.debug(f"Received new object: {response}")
-                        self._on_object(response)
+                        self._handle_other(response)
                 elif self._running:
                     logging.error(f"Received object of unknown class: {response}")
                     raise NotImplementedError("Received object of unknown class.")
@@ -200,7 +222,6 @@ class _PlayerClient(_XFluxClient):
                 self._game_handler.while_disconnected(player_client=self)
 
         logging.info("Done.")
-        sys.exit()
 
     def stop(self):
         """
@@ -208,5 +229,5 @@ class _PlayerClient(_XFluxClient):
         """
         logging.info("Shutting down...")
         if self._network_interface.connected:
-            self.close_connection()
+            self.disconnect()
         self._running = False
