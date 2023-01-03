@@ -109,9 +109,10 @@ class GameClient(XMLProtocolInterface):
     The PlayerClient handles all incoming and outgoing objects accordingly to their types.
     """
 
-    def __init__(self, host: str, port: int, handler: AbstractGameClient, survive: bool):
+    def __init__(self, host: str, port: int, handler: AbstractGameClient, auto_reconnect: bool, survive: bool):
         super().__init__(host, port)
         self._game_handler = handler
+        self.auto_reconnect = auto_reconnect
         self.survive = survive
 
     def join_game(self):
@@ -183,7 +184,7 @@ class GameClient(XMLProtocolInterface):
         """
         Starts the client loop.
         """
-        self._running = True
+        self.running = True
         self._client_loop()
 
     def _handle_left(self):
@@ -194,6 +195,16 @@ class GameClient(XMLProtocolInterface):
             logging.info("The server left. Client is in survive mode and keeps running.\n"
                          "Please shutdown the client manually.")
             self.disconnect()
+            if self.auto_reconnect:
+                for _ in range(3):
+                    try:
+                        self.connect()
+                        if self.network_interface.connected:
+                            logging.info("Reconnected to server.")
+                            break
+                    except Exception as e:
+                        logging.exception(e)
+                    time.sleep(1)
 
     def _handle_other(self, response):
         logging.debug(f"Received new object: {response}")
@@ -205,8 +216,8 @@ class GameClient(XMLProtocolInterface):
         and handles them accordingly.
         """
 
-        while self._running:
-            if self._network_interface.connected:
+        while self.running:
+            if self.network_interface.connected:
                 response = self._receive()
                 if not response:
                     continue
@@ -215,7 +226,7 @@ class GameClient(XMLProtocolInterface):
                         self._handle_left()
                     else:
                         self._handle_other(response)
-                elif self._running:
+                elif self.running:
                     logging.error(f"Received object of unknown class: {response}")
                     raise NotImplementedError("Received object of unknown class.")
             else:
@@ -228,6 +239,6 @@ class GameClient(XMLProtocolInterface):
         Disconnects from the server and stops the client loop.
         """
         logging.info("Shutting down...")
-        if self._network_interface.connected:
+        if self.network_interface.connected:
             self.disconnect()
-        self._running = False
+        self.running = False

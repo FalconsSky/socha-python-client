@@ -63,9 +63,9 @@ class XMLProtocolInterface:
     """
 
     def __init__(self, host: str, port: int):
-        self._network_interface = NetworkSocket(host, port)
+        self.network_interface = NetworkSocket(host, port)
         self.connect()
-        self._running = False
+        self.running = False
 
         context = XmlContext()
         deserialize_config = ParserConfig(class_factory=customClassFactory)
@@ -78,14 +78,14 @@ class XMLProtocolInterface:
         """
         Creates a TCP connection with the server.
         """
-        self._network_interface.connect()
+        self.network_interface.connect()
 
     def disconnect(self):
         """
         Sends a closing xml to the server and closes the connection afterwards.
         """
         self._send(Close())
-        self._network_interface.close()
+        self.network_interface.close()
 
     def _receive(self):
         """
@@ -94,7 +94,7 @@ class XMLProtocolInterface:
         :return: The next object in the stream, or None if the server returns an empty response.
         """
         try:
-            receiving = self._network_interface.receive()
+            receiving = self.network_interface.receive()
 
             # Return None if the server returns an empty response
             if not receiving:
@@ -104,11 +104,11 @@ class XMLProtocolInterface:
             return cls
         except OSError:
             logging.error("An OSError occurred while receiving data from the server.")
-            self._running = False
+            self.running = False
             raise
         except Exception as e:
             logging.error("An error occurred while receiving data from the server: %s", e)
-            self._running = False
+            self.running = False
             raise
 
     def _send(self, obj: ProtocolPacket) -> None:
@@ -124,7 +124,7 @@ class XMLProtocolInterface:
             shipment = self._protocol_prefix() + encode(obj)
 
         try:
-            self._network_interface.send(shipment)
+            self.network_interface.send(shipment)
         except Exception as e:
             logging.exception("Error sending shipment to server: %s", e)
             raise
