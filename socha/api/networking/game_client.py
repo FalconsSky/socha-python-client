@@ -160,7 +160,7 @@ class GameClient(XMLProtocolInterface):
                 # Convert the board data and create a GameState object
                 game_state = GameState(
                     turn=message.data.class_binding.turn,
-                    start_team=Team(message.data.class_binding.start_team),
+                    start_team=Team(message.data.class_binding.start_team, [], 0),
                     board=_convertBoard(message.data.class_binding.board),
                     last_move=message.data.class_binding.last_move,
                     fishes=penguins.Fishes(message.data.class_binding.fishes.int_value[0],

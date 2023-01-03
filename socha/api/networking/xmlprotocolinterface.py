@@ -24,7 +24,7 @@ def customClassFactory(clazz, params: dict):
         except KeyError:
             ...
         if params.get("class_value") == "welcomeMessage":
-            welcome_message = WelcomeMessage(Team(params.get("color")))
+            welcome_message = WelcomeMessage(Team(params.get("color"), penguins=None, fish=0))
             return clazz(class_binding=welcome_message, **params)
         elif params.get("class_value") == "memento":
             state_object = params.get("state")

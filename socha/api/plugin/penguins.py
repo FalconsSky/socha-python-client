@@ -3,18 +3,8 @@ This is the plugin for this year's game `Penguins`.
 """
 import logging
 import math
-from typing import List, Union, Optional
-from warnings import warn
-
-_hexagonTemplate = [
-    "  _______  \xA0",
-    " /       \\ \xA0",
-    "/XXXXXXXXX\\\xA0",
-    "\\YYYYYYYYY/\xA0",
-    " \\_______/ \xA0"
-]
-
-_emptyHexagonPlaceholder = "\xA0\xA0\xA0\xA0\xA0\xA0"
+from enum import Enum
+from typing import List, Optional
 
 
 class Vector:
@@ -308,427 +298,714 @@ class HexCoordinate:
         return isinstance(other, HexCoordinate) and self.x == other.x and self.y == other.y
 
 
-class Move:
-    """
-    Represents a move in the game.
-    """
-
-    def __init__(self, to_value: HexCoordinate, from_value: HexCoordinate = None):
-        """
-        :param to_value: The destination of the move.
-        :param from_value: The origin of the move.
-        """
-        self.from_value = from_value
-        self.to_value = to_value
-
-    def get_delta(self):
-        """
-        Gets the distance between the origin and the destination.
-
-        :return: The delta of the move as a Vector object.
-        """
-        return self.to_value.distance(self.from_value)
-
-    def reversed(self):
-        """
-        Reverses the move.
-
-        :return: The reversed move.
-        """
-        return Move(from_value=self.to_value, to_value=self.from_value)
-
-    def __str__(self) -> str:
-        return "Move(from = {}, to = {})".format(self.from_value, self.to_value)
-
-    def __eq__(self, __o: object) -> bool:
-        return isinstance(__o, Move) and self.to_value == __o.to_value and \
-               (self.from_value is None or self.from_value == __o.from_value)
+class TeamEnum(Enum):
+    ONE = "ONE"
+    TWO = "TWO"
 
 
 class Team:
     """
-    Represents a team in the game.
+    The Team class is useful for storing and manipulating information about teams in the game. It allows
+    you to easily create objects for each team, keep track of their attributes, and compare them to their opponents.
     """
 
-    def __init__(self, color: str):
-        """
-        A Team can be either yourself or your opponent.
-
-        :param color: The color of the team. Can be either 'ONE' or 'TWO'.
-        """
-        self.teams = {
-            'ONE': {
-                'opponent': 'TWO',
-                'letter': 'R',
-                'color': 'Rot'
-            },
-            'TWO': {
-                'opponent': 'ONE',
-                'letter': 'B',
-                'color': 'Blau'
-            }
-        }
-        if color not in self.teams:
-            raise Exception(f"Invalid color: {color}")
-        self.color = color
-
-    def team(self) -> 'Team':
-        """
-        :return: The team object.
-        """
-        return self
+    def __init__(self, name: TeamEnum, penguins: Optional[List], fish: int):
+        self.name = name
+        self.penguins = penguins
+        self.fish = fish
 
     def opponent(self) -> 'Team':
-        """
-        :return: The opponent of this team.
-        """
-        return Team(self.teams[self.color]['opponent'])
+        if self.name == TeamEnum.ONE:
+            return Team(TeamEnum.TWO, [], 0)
+        else:
+            return Team(TeamEnum.ONE, [], 0)
 
-    def __eq__(self, __o: object) -> bool:
-        return isinstance(__o, Team) and self.color == __o.color
+    def __repr__(self) -> str:
+        return f"Team(name={self.name}, penguins={self.penguins}, fish={self.fish})"
 
     def __str__(self) -> str:
-        return self.teams[self.color]
+        return f"Team(name={self.name}, penguins={self.penguins}, fish={self.fish})"
+
+
+class Move:
+    """
+        The Move class is a blueprint for creating objects that represent a move in a game. It has certain attributes
+        that define what a move is and what it can do.
+
+        The attributes of a Move object include the start position of the move (from_value), the end position of the
+        move ( to_value), and the team making the move (team).
+
+        The behaviors of a Move object include calculating the distance between the start and end positions (delta),
+        creating a new Move object with the start and end positions reversed (reverse).
+
+        You can create a Move object by calling the Move class and passing it the necessary information (the start
+        and end positions and the team).
+    """
+
+    def __init__(self, from_value: Optional[HexCoordinate], to_value: HexCoordinate, team: TeamEnum):
+        self.from_value = from_value
+        self.to_value = to_value
+        self.team = team
+
+    def delta(self):
+        if self.from_value is not None:
+            return self.from_value.to_cartesian().distance(self.to_value.to_cartesian())
+        return self.to_value.to_cartesian().distance(CartesianCoordinate(0, 0))
+
+    def reverse(self):
+        return Move(self.to_value, self.from_value if self.from_value is not None else HexCoordinate(0, 0), self.team)
+
+    def __repr__(self):
+        return f"Move(from={self.from_value}, to_value={self.to_value}, team={self.team})"
+
+    def __str__(self):
+        return f"Move(from={self.from_value}, to_value={self.to_value}, team={self.team})"
+
+
+class Penguin:
+    """
+        The Penguin class is a blueprint for creating objects that represent a penguin in a game.
+
+        You can create a Penguin object by calling the Penguin class and passing it the necessary information (the
+        position and team). Once you have a Penguin object, you can use its attributes and methods to get information
+        about the penguin or generate a string representation of the object.
+    """
+
+    def __init__(self, position: HexCoordinate, team: TeamEnum):
+        self.position = position
+        self.team = team
+
+    def __repr__(self) -> str:
+        return f"Penguin(position={self.position}, team={self.team})"
+
+    def __str__(self) -> str:
+        return f"Penguin(position={self.position}, team={self.team})"
 
 
 class Field:
     """
-    Represents a field in the game.
+        The Field class is a blueprint for creating objects that represent a field on a game board.
+
+        You can create a Field object by calling the Field class and passing it the necessary information (the
+        coordinate, penguin, and fish). Once you have a Field object, you can use its attributes and methods to get
+        information about the field or generate a string representation of the object.
     """
 
-    def __init__(self, coordinate: HexCoordinate, field: Union[int, str, Team]):
-        """
-        The Field represents a field on the game board.
-        It says what state itself it has and where it is on the board.
-
-        :param coordinate: The coordinate of the field.
-        :param field: The state of the field. Can be either the number of fishes, or a Team.
-        """
+    def __init__(self, coordinate: HexCoordinate, penguin: Optional[Penguin], fish: int):
         self.coordinate = coordinate
-        self.field: Union[int, str, Team]
-        if isinstance(field, int):
-            self.field = field
-        elif field.isalpha():
-            self.field = Team(field)
-        else:
-            raise TypeError(f"The field's input is wrong: {field}")
+        self.penguin = penguin
+        self.fish = fish
 
     def is_empty(self) -> bool:
-        """
-        :return: True if the field is has no fishes, False otherwise.
-        """
-        return self.field == 0
+        return self.fish == 0 and self.penguin is None
 
-    def is_occupied(self) -> bool:
-        """
-        :return: True if the field is occupied by a penguin, False otherwise.
-        """
-        return isinstance(self.field, Team)
+    def has_penguin(self) -> bool:
+        return self.penguin is not None
 
-    def get_fish(self) -> Union[None, int]:
-        """
-        :return: The amount of fish on the field, None if the field is occupied.
-        """
-        return None if self.is_occupied() else self.field
-
-    def get_team(self) -> Union[Team, None]:
-        """
-        :return: The team of the field if it is occupied by penguin, None otherwise.
-        """
-        return self.field if isinstance(self.field, Team) else None
-
-    def __eq__(self, __o: object) -> bool:
-        return isinstance(__o, Field) and self.field == __o.field
-    
-    def __repr__(self):
-        if isinstance(self.field, int):
-            return f"Field({self.coordinate}, Fish({self.field}))"
+    def get_team(self) -> Optional[TeamEnum]:
+        if self.penguin:
+            return self.penguin.team
         else:
-            return f"Field({self.coordinate}, {self.field})"
+            return None
+
+    def __repr__(self) -> str:
+        return f"Field(coordinate={self.coordinate}, penguin={self.penguin}, fish={self.fish})"
+
+    def __str__(self) -> str:
+        return f"Field(coordinate={self.coordinate}, penguin={self.penguin}, fish={self.fish})"
 
 
 class Board:
     """
-    Class which represents a game board. Consisting of a two-dimensional array of fields.
+        The Board class represents a board in a game where each field on the board is represented by a
+        single bit in a 64-bit integer. The class has several methods that allow you to manipulate the board,
+        such as moving pieces around or checking whether two boards are equivalent.
+
+        The class has several instance variables, each of which is a 64-bit integer that represents a different
+        aspect of the board. For example, one variable might represent which fields have penguins on them and which
+        do not, while another variable might represent which fields have fish on them.
+
+        One of the main purposes of the Board class is to allow you to quickly check whether certain conditions
+        are true about the board. For example, you might want to know whether two boards are equivalent, or whether a
+        particular field is occupied by a penguin or fish. The class has methods that allow you to do these kinds of
+        checks quickly, by using bitwise operations on the integers that represent the board.
+
+        Another purpose of the Board class is to allow you to make changes to the board. For example, you might
+        want to move a penguin from one field to another, or place a new penguin on the board. The class has methods
+        that allow you to do these kinds of actions, by changing the values of the instance variables that represent
+        the board.
+
+        Overall, the Board class is a useful tool for representing and manipulating game boards in a fast and
+        efficient way. It is especially useful in situations where you need to perform many different kinds of
+        operations on the board, or where you need to quickly check the state of the board in different ways.
     """
 
-    def __init__(self, game_field: List[List[Field]]):
+    def __init__(self, one: int, two: int, fish_0: int, fish_1: int, fish_2: int, fish_3: int, fish_4: int):
         """
-        The Board shows the state where each field is, how many fish and which team is on each field.
+            Inits Board with given bitmasks.
 
-        :param game_field: The game field as a two-dimensional array of fields.
+            Args:
+                one (int): Bitmask representing the penguins of team ONE
+                two (int): Bitmask representing the penguins of team TWO
+                fish_0 (int): Bitmask representing set 0 fish
+                fish_1 (int): Bitmask representing set 1 fish
+                fish_2 (int): Bitmask representing set 2 fish
+                fish_3 (int): Bitmask representing set 3 fish
+                fish_4 (int): Bitmask representing set 4 fish
         """
-        self._game_field = game_field
+        self.one = one
+        self.two = two
+        self.fish_0 = fish_0
+        self.fish_1 = fish_1
+        self.fish_2 = fish_2
+        self.fish_3 = fish_3
+        self.fish_4 = fish_4
 
-    def get_empty_fields(self) -> List[Field]:
-        """
-        :return: A list of all empty fields.
-        """
-        fields: List[Field] = []
-        for row in self._game_field:
-            for field in row:
-                if field.is_empty():
-                    fields.append(field)
-        return fields
+    @staticmethod
+    def width():
+        """Returns the width of the board."""
+        return 8
 
-    def is_occupied(self, coordinates: HexCoordinate) -> bool:
-        """
-        :param coordinates: The coordinates of the field.
-        :return: True if the field is occupied, false otherwise.
-        """
-        return self.get_field(coordinates).is_occupied()
+    @staticmethod
+    def height():
+        """Returns the height of the board."""
+        return 8
 
-    def is_valid(self, coordinates: HexCoordinate) -> bool:
+    def equivalence(self, other: 'Board') -> bool:
         """
-        Checks if the coordinates are in the boundaries of the board.
+            Returns True if this Board is equivalent to the given Board.
 
-        :param coordinates: The coordinates of the field.
-        :return: True if the field is valid, false otherwise.
-        """
-        arrayCoordinates = coordinates.to_cartesian()
-        return 0 <= arrayCoordinates.x < self.width() and 0 <= arrayCoordinates.y < self.height()
+            Args:
+                other (Board): Board to compare against
 
-    def width(self) -> int:
-        """
-        :return: The width of the board.
-        """
-        return len(self._game_field)
+            Returns:
+                bool: True if equivalent, False otherwise
+            """
+        return (
+                self.one == other.one and self.two == other.two and
+                self.fish_0 == other.fish_0 and self.fish_1 == other.fish_1 and
+                self.fish_2 == other.fish_2 and self.fish_3 == other.fish_3 and
+                self.fish_4 == other.fish_4
+        )
 
-    def height(self) -> int:
+    def is_empty(self) -> bool:
         """
-        :return: The height of the board.
+            Returns True if all bitmasks in this Board are empty.
+
+            Returns:
+                bool: True if all bitmasks are empty, False otherwise
         """
-        return len(self._game_field[0])
+        return (
+                self.one == 0 and self.two == 0 and
+                self.fish_0 == 0 and self.fish_1 == 0 and
+                self.fish_2 == 0 and self.fish_3 == 0 and
+                self.fish_4 == 0
+        )
 
-    def _get_field(self, x: int, y: int) -> Field:
+    def intersection(self, other: 'Board') -> 'Board':
         """
-        Gets the field at the given coordinates.
-        *Used only internally*
+            Returns a new Board containing the intersection of the bitmasks in this and the given Board.
 
-        :param x: The x-coordinate of the field.
-        :param y: The y-coordinate of the field.
-        :return: The field at the given coordinates.
+            Args:
+                other (Board): Board to intersect with
+
+            Returns:
+                Board: New Board with intersecting bitmasks
         """
-        return self._game_field[y][x]
+        return Board(self.one & other.one, self.two & other.two, self.fish_0 & other.fish_0,
+                     self.fish_1 & other.fish_1, self.fish_2 & other.fish_2, self.fish_3 & other.fish_3,
+                     self.fish_4 & other.fish_4)
 
-    def get_field(self, position: HexCoordinate) -> Field:
+    def union(self, other: 'Board') -> 'Board':
         """
-        Gets the field at the given position.
+            Returns a new Board containing the union of the bitmasks in this and the given Board.
 
-        :param position: The position of the field.
-        :return: The field at the given position.
-        :raise IndexError: If the position is not valid.
+            Args:
+                other (Board): Board to union with
+
+            Returns:
+                Board: New Board with united bitmasks
         """
-        cartesian = position.to_cartesian()
-        if self.is_valid(position):
-            return self._get_field(cartesian.x, cartesian.y)
+        return Board(self.one | other.one, self.two | other.two, self.fish_0 | other.fish_0,
+                     self.fish_1 | other.fish_1, self.fish_2 | other.fish_2, self.fish_3 | other.fish_3,
+                     self.fish_4 | other.fish_4)
 
-        raise IndexError(f"Index out of range: [x={cartesian.x}, y={cartesian.y}]")
-
-    def get_field_or_none(self, position: HexCoordinate) -> Union[Field, None]:
+    def difference(self, other: 'Board') -> 'Board':
         """
-        Gets the field at the given position no matter if it is valid or not.
+            Returns a new Board containing the difference of the bitmasks in this and the given Board.
 
-        :param position: The position of the field.
-        :return: The field at the given position, or None if the position is not valid.
+            Args:
+                other (Board): Board to difference with
+
+            Returns:
+                Board: New Board with bitmasks representing the difference between this and the given Board
         """
-        cartesian = position.to_cartesian()
-        if self.is_valid(position):
-            return self._get_field(cartesian.x, cartesian.y)
-        return None
+        return Board(self.one & ~other.one, self.two & ~other.two, self.fish_0 & ~other.fish_0,
+                     self.fish_1 & ~other.fish_1, self.fish_2 & ~other.fish_2, self.fish_3 & ~other.fish_3,
+                     self.fish_4 & ~other.fish_4)
 
-    def get_field_by_index(self, index: int) -> Field:
+    def disjoint(self, other: 'Board') -> bool:
         """
-        Gets the field at the given index. The index is the position of the field in the board.
-        The field of the board is calculated as follows:
+            Returns True if the bitmasks in this and the given Board have no intersections.
 
-        - `x = index / width`
-        - `y = index % width`
-        - The index is 0-based. The index is calculated from the top left corner of the board.
+            Args:
+                other (Board): Board to check for intersection with
 
-        :param index: The index of the field.
-        :return: The field at the given index.
+            Returns:
+                bool: True if no intersection, False otherwise
         """
-        return self.get_field(CartesianCoordinate.from_index(index).to_hex())
+        return self.intersection(other).is_empty()
 
-    def get_all_fields(self) -> List[Field]:
+    def complement(self) -> 'Board':
         """
-        Gets all Fields of the board.
+            Returns a new Board containing the complement of the bitmasks in this Board.
 
-        :return: All Fields of the board.
+            Returns:
+                Board: New Board with complemented bitmasks
         """
-        return [self.get_field_by_index(i) for i in range(self.width() * self.height())]
+        return Board(~self.one, ~self.two, ~self.fish_0, ~self.fish_1, ~self.fish_2, ~self.fish_3, ~self.fish_4)
 
-    def compare_to(self, other: 'Board') -> List[Field]:
+    def implication(self, other: 'Board') -> 'Board':
         """
-        Compares two boards and returns a list of the Fields that are different.
+            Returns a new Board containing the result of the implication of the bitmasks in this
+            and the given Board.
 
-        :param other: The other board to compare to.
-        :return: A list of Fields that are different or a empty list if the boards are equal.
-        """
-        fields = [field for row in [self_field for self_field, other_field in zip(self._game_field, other._game_field)
-                                    if self_field != other_field] for field in row]
-        return fields
+            Args:
+                other (Board): Board to perform implication with
 
-    def contains(self, field: Field) -> bool:
+            Returns:
+                Board: New Board with bitmasks representing the implication of this and the given Board
         """
-        Checks if the board contains the given field.
+        return Board((~self.one) | other.one, (~self.two) | other.two, (~self.fish_0) | other.fish_0,
+                     (~self.fish_1) | other.fish_1, (~self.fish_2) | other.fish_2, (~self.fish_3) | other.fish_3,
+                     (~self.fish_4) | other.fish_4)
 
-        :param field: The field to check for.
-        :return: True if the board contains the field, False otherwise.
+    def exclusive_or(self, other: 'Board') -> 'Board':
         """
-        for row in self._game_field:
-            if field in row:
-                return True
-        return False
+            Returns a new Board containing the result of the exclusive or (XOR) of the bitmasks in this
+            and the given Board.
 
-    def contains_all(self, fields: List[Field]) -> bool:
-        """
-        Checks if the board contains all the given fields.
+            Args:
+                other (Board): Board to perform exclusive or with
 
-        :param fields: The fields to check for.
-        :return: True if the board contains all the given fields, False otherwise.
+            Returns:
+                Board: New Board with bitmasks representing the exclusive or of this and the given Board
         """
-        for field in fields:
-            if not self.contains(field):
+        return Board(self.one ^ other.one, self.two ^ other.two, self.fish_0 ^ other.fish_0,
+                     self.fish_1 ^ other.fish_1, self.fish_2 ^ other.fish_2, self.fish_3 ^ other.fish_3,
+                     self.fish_4 ^ other.fish_4)
+
+    def empty_bitmask(self) -> int:
+        """
+            Returns an integer representing a bitmask with all bits set to 1 except for the bits
+            set in any of the bitmasks in this Board.
+
+            Returns:
+                int: Bitmask with all bits set except those set in this Board
+        """
+        return ~(self.one | self.two | self.fish_0 | self.fish_1 | self.fish_2 | self.fish_3 | self.fish_4)
+
+    def update(self, move: Move):
+        """
+            Updates this Board to reflect the given move.
+
+            Args:
+                move (Move): Move to reflect in this Board
+        """
+        if move.from_value is not None:
+            from_coord = move.from_value.to_cartesian().to_index()
+            to_coord = move.to_value.to_cartesian().to_index()
+            if move.team == TeamEnum.ONE:
+                self.one ^= 1 << from_coord
+                self.one |= 1 << to_coord
+            elif move.team == TeamEnum.TWO:
+                self.two ^= 1 << from_coord
+                self.two |= 1 << to_coord
+        else:
+            to_coord = move.to_value.to_cartesian().to_index()
+            if move.team == TeamEnum.ONE:
+                self.one |= 1 << to_coord
+            elif move.team == TeamEnum.TWO:
+                self.two |= 1 << to_coord
+
+    def set_field(self, field: Field):
+        """
+            Sets the bitmasks in this Board to reflect the given field.
+
+            Args:
+                field (Field): Field to reflect in this Board
+        """
+        if field.penguin is not None:
+            penguin = field.penguin
+            index = penguin.position.to_cartesian().to_index()
+            if penguin.team == TeamEnum.ONE:
+                self.one |= 1 << index
+            elif penguin.team == TeamEnum.TWO:
+                self.two |= 1 << index
+        else:
+            fish = field.fish
+            index = field.coordinate.to_cartesian().to_index()
+            if fish == 0:
+                self.fish_0 |= 1 << index
+            elif fish == 1:
+                self.fish_1 |= 1 << index
+            elif fish == 2:
+                self.fish_2 |= 1 << index
+            elif fish == 3:
+                self.fish_3 |= 1 << index
+            elif fish == 4:
+                self.fish_4 |= 1 << index
+            else:
+                raise Exception(f"Fish value not allowed.\nFish value was: {fish}")
+
+    def get_penguin(self, coordinate: HexCoordinate) -> Optional[Penguin]:
+        """
+            Returns the penguin at the given coordinate, if any.
+
+            Args:
+                coordinate (HexCoordinate): Coordinate to get penguin at
+
+            Returns:
+                Optional[Penguin]: Penguin at the given coordinate, or None if no penguin present
+        """
+        index = coordinate.to_cartesian().to_index()
+        if self.one & (1 << index) != 0:
+            return Penguin(coordinate, TeamEnum.ONE)
+        elif self.two & (1 << index) != 0:
+            return Penguin(coordinate, TeamEnum.TWO)
+        else:
+            return None
+
+    def get_fish(self, index: int) -> int:
+        """
+            Returns the value of the fish at the given index.
+
+            Args:
+                index (int): Index of fish to get value of
+
+            Returns:
+                int: Value of fish at the given index
+        """
+        if self.fish_0 & (1 << index) != 0:
+            return 0
+        elif self.fish_1 & (1 << index) != 0:
+            return 1
+        elif self.fish_2 & (1 << index) != 0:
+            return 2
+        elif self.fish_3 & (1 << index) != 0:
+            return 3
+        elif self.fish_4 & (1 << index) != 0:
+            return 4
+        else:
+            return 0
+
+    def get_field(self, index: int) -> Field:
+        """
+            Returns the field at the given index.
+
+            Args:
+                index (int): Index of field to get
+
+            Returns:
+                Field: Field at the given index
+        """
+        coordinate = CartesianCoordinate.from_index(index).to_hex()
+        penguin = self.get_penguin(coordinate)
+        fish = self.get_fish(coordinate.to_cartesian().to_index())
+        field = Field(coordinate, penguin, fish)
+        return field
+
+    def is_occupied(self, index: int) -> bool:
+        """
+            Returns True if the field at the given index is occupied by a penguin.
+
+            Args:
+                index (int): Index of field to check
+
+            Returns:
+                bool: True if field is occupied, False otherwise
+        """
+        return (self.one & (1 << index) != 0) or (self.two & (1 << index) != 0)
+
+    @staticmethod
+    def is_valid(index: int) -> bool:
+        """
+            Returns True if the given index is valid (i.e., within the range of the board).
+
+            Args:
+                index (int): Index to check for validity
+
+            Returns:
+                bool: True if index is valid, False otherwise
+        """
+        return index < 64
+
+    def contains_field(self, index: int) -> bool:
+        """
+            Returns True if the field at the given index is occupied or contains fish.
+
+            Args:
+                index (int): Index of field to check
+
+            Returns:
+                bool: True if field is occupied or contains fish, False otherwise
+        """
+        return (self.one & (1 << index) != 0) or (self.two & (1 << index) != 0) or (
+                self.fish_0 & (1 << index) != 0) or (self.fish_1 & (1 << index) != 0) or (
+                       self.fish_2 & (1 << index) != 0) or (self.fish_3 & (1 << index) != 0) or (
+                       self.fish_4 & (1 << index) != 0)
+
+    def contains(self, indexes: List[int]) -> bool:
+        """
+            Returns True if all the fields at the given indexes are occupied or contain fish.
+
+            Args:
+                indexes (List[int]): Indexes of fields to check
+
+            Returns:
+                bool: True if all fields are occupied or contain fish, False otherwise
+        """
+        for index in indexes:
+            if not self.contains_field(index):
                 return False
         return True
 
-    def get_moves_in_direction(self, origin: HexCoordinate, direction: Vector) -> List[Move]:
+    def is_team(self, team: TeamEnum, index: int) -> bool:
         """
-        Gets all moves in the given direction from the given origin.
+            Returns True if the field at the given index is occupied by a penguin of the given team.
 
-        :param origin: The origin of the move.
-        :param direction: The direction of the move.
-        :return: A list with all moves that fulfill the criteria.
+            Args:
+                team (TeamEnum): Team to check for
+                index (int): Index of field to check
+
+            Returns:
+                bool: True if field is occupied by a penguin of the given team, False otherwise
+        """
+        if team == TeamEnum.ONE:
+            return self.one & (1 << index) != 0
+        elif team == TeamEnum.TWO:
+            return self.two & (1 << index) != 0
+
+    @staticmethod
+    def get_coordinates(bitboard: int) -> List[HexCoordinate]:
+        """
+            Returns a list of the hexagonal coordinates occupied or containing fish in the given bitmask.
+
+            Args:
+                bitboard (int): Bitmask to get coordinates from
+
+            Returns:
+                List[HexCoordinate]: List of coordinates occupied or containing fish in the given bitmask
+        """
+        coordinates = []
+        for index in range(64):
+            if bitboard & (1 << index) != 0:
+                coordinates.append(CartesianCoordinate.from_index(index).to_hex())
+        return coordinates
+
+    @staticmethod
+    def get_bit_coordinate(field: 'Board') -> Optional[HexCoordinate]:
+        """
+            Returns the hexagonal coordinate occupied or containing fish in the given Board, if there is exactly one.
+
+            Args:
+                field (Board): Board to get coordinate from
+
+            Returns:
+                Optional[HexCoordinate]: Coordinate occupied or containing fish in the given Board,
+                if there is exactly one
+
+            Raises:
+                ValueError: If there is not exactly one bit set in the given Board
+        """
+        fields = [field.one, field.two, field.fish_0, field.fish_1, field.fish_2, field.fish_3, field.fish_4]
+
+        count = 0
+        index = 0
+        for i in range(64):
+            for f in fields:
+                if f & (1 << index) != 0:
+                    count += 1
+            index = i
+        if count == 1:
+            return CartesianCoordinate.from_index(index).to_hex()
+        else:
+            raise ValueError("More than one bit set in bitboards")
+
+    def get_directive_moves(self, index: int, direction: Vector, team: TeamEnum) -> List[Move]:
+        """
+            Returns a list of moves that can be made in a given direction from a given index, for a given team.
+
+            Moves are only returned if they are to an unoccupied field that contains fish.
+
+            Args:
+                index (int): Index to start from
+                direction (Vector): Direction to move in
+                team (TeamEnum): Team to make moves for
+
+            Returns:
+                List[Move]: List of moves that can be made in the given direction from the given index,
+                            for the given team
         """
         moves = []
-        for i in range(1, self.width()):
-            destination = origin.add_vector(direction.scalar_product(i))
-            move = Move(from_value=origin, to_value=destination)
-            if self._is_destination_valid(destination):
-                moves.append(move)
-            else:
-                break
+        origin = CartesianCoordinate.from_index(index).to_hex()
+        if self.is_team(team, index):
+            new_index = CartesianCoordinate.from_index(index).to_hex().add_vector(direction).to_cartesian().to_index()
+            while new_index is not None and self.is_valid(new_index) and not self.is_occupied(
+                    new_index) and self.get_fish(new_index) > 0:
+                moves.append(Move(origin, CartesianCoordinate.from_index(new_index).to_hex(), team))
+                new_index = CartesianCoordinate.from_index(new_index).to_hex().add_vector(
+                    direction).to_cartesian().to_index()
         return moves
 
-    def _is_destination_valid(self, field: HexCoordinate) -> bool:
-        return self.is_valid(field) and not self.is_occupied(field) and not \
-            self.get_field(field).is_empty()
-
-    def possible_moves_from(self, position: HexCoordinate) -> List[Move]:
+    def possible_moves_from(self, index: int, team: TeamEnum) -> List[Move]:
         """
-        Returns a list of all possible moves from the given position. That are all moves in all hexagonal directions.
+            Returns a list of all possible moves that can be made from a given index, for a given team.
 
-        :param position: The position to start from.
-        :return: A list of all possible moves from the given position.
-        :raise: IndexError if the position is not valid.
+            Moves are to unoccupied fields that contain fish.
+
+            Args:
+                index (int): Index to start from
+                team (TeamEnum): Team to make moves for
+
+            Returns:
+                List[Move]: List of all possible moves that can be made from the given index, for the given team
         """
-        if not self.is_valid(position):
-            raise ValueError(f"Invalid position: [x={position.x}, y={position.y}]")
-
-        return [move for direction in Vector().directions for move in self.get_moves_in_direction(position, direction)]
-
-    def get_penguins(self) -> List[Field]:
-        """
-        Searches the board for all penguins.
-
-        :return: A list of all Fields that are occupied by a penguin.
-        """
-        return [field for field in self.get_all_fields() if field.is_occupied()]
-
-    def get_teams_penguins(self, team: Team) -> List[HexCoordinate]:
-        """
-        Searches the board for all penguins of the given team.
-
-        :param team: The team to search for.
-        :return: A list of all coordinates that are occupied by a penguin of the given team.
-        """
-        teams_penguins = []
-        for x in range(self.width()):
-            for y in range(self.height()):
-                current_field = self.get_field(CartesianCoordinate(x, y).to_hex())
-                if current_field.is_occupied() and current_field.get_team().team() == team:
-                    coordinates = CartesianCoordinate(x, y).to_hex()
-                    teams_penguins.append(coordinates)
-        return teams_penguins
-
-    def get_most_fish(self) -> List[Field]:
-        """
-        Returns a list of all fields with the most fish.
-
-        :return: A list of Fields.
-        """
-
-        fields = list(filter(lambda field_x: not field_x.is_occupied(), self.get_all_fields()))
-        fields.sort(key=lambda field_x: field_x.get_fish(), reverse=True)
-        for i, field in enumerate(fields):
-            if field.get_fish() < fields[0].get_fish():
-                fields = fields[:i]
-        return fields
-
-    def get_board_intersection(self, other: 'Board') -> List[Field]:
-        """
-        Returns a list of all fields that are in both boards.
-
-        :param other: The other board to compare to.
-        :return: A list of Fields.
-        """
-        return [field for field in self.get_all_fields() if field in other.get_all_fields()]
-
-    def get_fields_intersection(self, other: List[Field]) -> List[Field]:
-        """
-        Returns a list of all fields that are in both list of Fields.
-
-        :param other: The other list of Fields to compare to.
-        :return: A list of Fields.
-        """
-        return [field for field in self.get_all_fields() if field in other]
+        moves = []
+        for direction in Vector().directions:
+            moves += self.get_directive_moves(index, direction, team)
+        return moves
 
     def move(self, move: Move) -> 'Board':
         """
-        Moves the penguin from the origin to the destination.
+            Returns a new Board object with a move applied to it.
 
-        :param move: The move to execute.
-        :return: The new board with the moved penguin.
+            The move can involve moving a penguin to an unoccupied field, or placing a new penguin on the board.
+
+            Args:
+                move (Move): The move to apply to the board
+
+            Returns:
+                Board: A new Board object with the move applied
         """
-        new_board = Board(self._game_field)
-        new_board._game_field[move.to_value.to_cartesian().x][move.to_value.to_cartesian().y] = \
-            Field(coordinate=move.to_value, field=new_board.get_field(move.to_value).field)
-        if move.from_value:
-            new_board._game_field[move.from_value.to_cartesian().x][move.from_value.to_cartesian().y] = \
-                Field(coordinate=move.from_value, field=0)
+        new_board = self
+        origin = move.from_value
+        destination = move.to_value
+        origin_index = origin.to_cartesian().to_index()
+        destination_index = destination.to_cartesian().to_index()
+        origin_field = self.get_field(origin_index)
+        destination_field = self.get_field(destination_index)
+        new_board.set_field(origin_field)
+        new_board.set_field(destination_field)
+
         return new_board
 
-    @staticmethod
-    def _fillUpString(placeholder: str, string: str) -> str:
-        len_placeholder = len(placeholder)
-        len_string = len(string)
-        difference = len_placeholder - len_string
-        rest = difference - int(difference / 2) * 2
-        return "\xA0" * int(difference / 2) + string + "\xA0" * int(difference / 2) + "\xA0" * rest
-
-    def pretty_print(self):
+    def get_empty_fields(self) -> List[Field]:
         """
-        Prints the board in a pretty way.
-        """
-        result = ""
-        for i, column in enumerate(self._game_field):
-            for row in _hexagonTemplate:
-                result += _emptyHexagonPlaceholder if i % 2 != 0 else ""
-                for field in column:
-                    if field.is_empty():
-                        hexagon = " " * len(row)
-                    elif "XXXXXXXXX" in row:
-                        hexagon = row.replace("XXXXXXXXX", self._fillUpString("XXXXXXXXX", str(field.coordinate)))
-                    else:
-                        hexagon = row.replace("YYYYYYYYY", self._fillUpString("YYYYYYYYY", str(field.field)))
-                    result += hexagon
-                result += "\n"
-        print(result)
+            Returns a list of Field objects representing the empty fields on the board.
 
-    def __eq__(self, __o: 'Board'):
-        return self._game_field == __o._game_field
+            Returns:
+                A list of Field objects that has 0 fish.
+        """
+        empty_fields = []
+        empty_bits = self.empty_bitmask()
+        for index in range(63):
+            if empty_bits >> index & 1 != 0:
+                coordinate = CartesianCoordinate.from_index(index).to_hex()
+                fish = self.get_fish(coordinate.to_cartesian().to_index())
+                field = Field(coordinate, None, fish)
+                empty_fields.append(field)
+        return empty_fields
+
+    def get_penguins(self) -> List[Penguin]:
+        """
+            Returns a list of Penguin objects representing the penguins on the board.
+
+            Returns:
+                A list of Penguin objects.
+        """
+        penguins = []
+        for index in range(64):
+            if self.one >> index & 1 != 0:
+                coordinate = CartesianCoordinate.from_index(index).to_hex()
+                penguins.append(Penguin(coordinate, TeamEnum.ONE))
+            if self.two >> index & 1 != 0:
+                coordinate = CartesianCoordinate.from_index(index).to_hex()
+                penguins.append(Penguin(coordinate, TeamEnum.TWO))
+        return penguins
+
+    def get_teams_penguins(self, team: TeamEnum) -> List[Penguin]:
+        """
+            Returns a list of Penguin objects representing the penguins belonging to the given team.
+
+            Args:
+                team: The team whose penguins should be returned.
+
+            Returns:
+                A list of Penguin objects belonging to the given team.
+        """
+        penguins = []
+        for index in range(64):
+            if team == TeamEnum.ONE and self.one >> index & 1 != 0:
+                coordinate = CartesianCoordinate.from_index(index).to_hex()
+                penguins.append(Penguin(coordinate, TeamEnum.ONE))
+            if team == TeamEnum.TWO and self.two >> index & 1 != 0:
+                coordinate = CartesianCoordinate.from_index(index).to_hex()
+                penguins.append(Penguin(coordinate, TeamEnum.TWO))
+        return penguins
+
+    def get_most_fish(self) -> List[Field]:
+        """
+            Returns a list of fields containing the most fish
+
+            This method returns a list of fields which contain the maximum number of fish
+            across all fields.
+
+            Returns:
+                List[Field]: A list of fields containing the most fish
+        """
+        max_fish = max(self.fish_0, self.fish_1, self.fish_2, self.fish_3, self.fish_4)
+        fields_with_most_fish = []
+        for i in range(64):
+            coordinate = CartesianCoordinate.from_index(i).to_hex()
+            fish = self.get_fish(coordinate.to_cartesian().to_index())
+            field = Field(coordinate, None, fish)
+            if (self.fish_0 & (1 << i)) and self.fish_0 == max_fish:
+                fields_with_most_fish.append(field)
+            elif (self.fish_1 & (1 << i)) and self.fish_1 == max_fish:
+                fields_with_most_fish.append(field)
+            elif (self.fish_2 & (1 << i)) and self.fish_2 == max_fish:
+                fields_with_most_fish.append(field)
+            elif (self.fish_3 & (1 << i)) and self.fish_3 == max_fish:
+                fields_with_most_fish.append(field)
+            elif (self.fish_4 & (1 << i)) and self.fish_4 == max_fish:
+                fields_with_most_fish.append(field)
+        return fields_with_most_fish
+
+    def __repr__(self) -> str:
+        string = ""
+        string += "\n"
+        for index in range(64):
+            if self.one & (1 << index) != 0:
+                string += "□"
+            elif self.two & (1 << index) != 0:
+                string += "■"
+            elif self.fish_0 & (1 << index) != 0:
+                string += "0"
+            elif self.fish_1 & (1 << index) != 0:
+                string += "1"
+            elif self.fish_2 & (1 << index) != 0:
+                string += "2"
+            elif self.fish_3 & (1 << index) != 0:
+                string += "3"
+            elif self.fish_4 & (1 << index) != 0:
+                string += "4"
+            else:
+                string += "."
+            string += "  "
+            if index % 8 == 7:
+                string += "\n"
+        return string
 
 
 class Fishes:
@@ -747,12 +1024,12 @@ class Fishes:
         :param team: A team object, that represents the team to get the fish amount of.
         :return: The amount of fish of the given team.
         """
-        return self.fishes_one if team.team_enum == Team("ONE").team_enum else self.fishes_two
+        return self.fishes_one if team.name == TeamEnum.ONE else self.fishes_two
 
     def add_fish(self, team: Team, fish: int):
-        if team == Team("ONE"):
+        if team.name == TeamEnum.ONE:
             self.fishes_one += fish
-        elif team == Team("TWO"):
+        elif team.name == TeamEnum.TWO:
             self.fishes_two += fish
         else:
             raise ValueError(f"Invalid team: {team}")
@@ -797,16 +1074,16 @@ class GameState:
         self.other_team = self.current_team_from_turn().opponent()
         self.last_move = last_move
         self.fishes = fishes
-        self.current_pieces = self.board.get_teams_penguins(self.current_team)
+        self.current_pieces = self.board.get_teams_penguins(self.current_team.name)
         self.possible_moves = self._get_possible_moves(self.current_team)
 
     def _get_possible_moves(self, current_team: Team = None) -> List[Move]:
-        current_team = current_team or self.current_team
-        fields = [self.board.get_field(CartesianCoordinate(x, y).to_hex()) for x in range(self.board.width()) for y in
+        current_team = current_team.name or self.current_team.name
+        fields = [self.board.get_field(CartesianCoordinate(x, y).to_index()) for x in range(self.board.width()) for y in
                   range(self.board.height())]
         if len(self.board.get_teams_penguins(current_team)) < 4:
-            moves = [Move(from_value=None, to_value=field.coordinate) for field in fields if
-                     not field.is_occupied() and field.get_fish() == 1]
+            moves = [Move(from_value=None, to_value=field.coordinate, team=current_team) for field in fields if
+                     not field.penguin and field.fish == 1]
         else:
             moves = [move for penguin in self.board.get_teams_penguins(current_team) for move in
                      self.board.possible_moves_from(penguin)]
@@ -834,7 +1111,8 @@ class GameState:
             raise Exception(f"Invalid move: {move}")
 
         new_board = self.board.move(move)
-        new_fishes = self.fishes.add_fish(self.current_team, new_board.get_field(move.to_value).get_fish())
+        new_fishes = self.fishes.add_fish(self.current_team,
+                                          new_board.get_field(move.to_value.to_cartesian().to_index()).fish)
         return GameState(board=new_board, turn=self.turn + 1, start_team=self.start_team, fishes=new_fishes,
                          last_move=move)
 
@@ -846,4 +1124,3 @@ class GameState:
         :return: True if the move is valid, False otherwise.
         """
         return move in self.possible_moves
-
